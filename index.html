@@ -6,75 +6,72 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <div class="app">
-    <aside class="sidebar">
-      <header class="sidebar-header">
-        <h1 class="app-title">Memo</h1>
-        <button id="new-note-btn" class="icon-btn" title="新しいメモ (Ctrl+N)">＋</button>
-      </header>
-
-      <div class="search-box">
-        <input
-          id="search-input"
-          type="text"
-          placeholder="検索（タイトル / 本文 / タグ）"
-        >
+<body class="landing-body">
+  <div class="landing">
+    <header class="landing-header">
+      <div class="landing-logo">High Performance Memo</div>
+      <div class="landing-header-right">
+        <button id="landing-theme-toggle" class="top-theme-btn" title="テーマ切り替え">🌙</button>
+        <a href="memo.html" class="landing-link">メモアプリへ →</a>
       </div>
+    </header>
 
-      <div class="filter-row">
-        <button class="filter-btn active" data-filter="all">すべて</button>
-        <button class="filter-btn" data-filter="pinned">ピン留め</button>
-      </div>
-
-      <ul id="note-list" class="note-list"></ul>
-    </aside>
-
-    <main class="editor">
-      <div class="editor-header">
-        <input
-          id="note-title"
-          class="note-title-input"
-          type="text"
-          placeholder="タイトル"
-        >
-        <div class="editor-actions">
-          <button id="pin-toggle" class="chip-btn" title="ピン留め切り替え">
-            📌 ピン留め
-          </button>
-          <button id="delete-note" class="chip-btn danger" title="メモを削除">
-            🗑 削除
-          </button>
+    <main class="landing-main">
+      <section class="landing-hero">
+        <p class="landing-tag">ブラウザだけで動く / ローカル保存</p>
+        <h1>サクサク動く<br>高性能メモアプリ。</h1>
+        <p class="landing-text">
+          自動保存・タグ・検索・ピン留め・バックアップ。<br>
+          ログイン不要で、あなたのPCの中だけに保存されます。
+        </p>
+        <div class="landing-actions">
+          <a href="memo.html" class="btn primary big">💾 メモを開く</a>
+          <a href="#features" class="btn secondary big">機能を見る</a>
         </div>
-      </div>
+      </section>
 
-      <div class="meta-row">
-        <span id="meta-created" class="meta-text"></span>
-        <span id="meta-updated" class="meta-text"></span>
-      </div>
-
-      <textarea
-        id="note-content"
-        class="note-content"
-        placeholder="ここにメモを書く…"
-      ></textarea>
-
-      <div class="tags-row">
-        <input
-          id="tag-input"
-          class="tag-input"
-          type="text"
-          placeholder="タグを入力して Enter"
-        >
-        <div id="tag-list" class="tag-list"></div>
-      </div>
-
-      <div class="bottom-bar">
-        <span id="autosave-status" class="autosave-status">保存済み</span>
-      </div>
+      <section id="features" class="landing-features">
+        <h2>主な機能</h2>
+        <ul>
+          <li>複数メモ管理（左リスト＋右エディタ）</li>
+          <li>自動保存 & 手動保存ボタン</li>
+          <li>全文検索（タイトル・本文・タグ）</li>
+          <li>タグ管理・ピン留め</li>
+          <li>バックアップ書き出し & 読み込み</li>
+          <li>ライト / ダークテーマ切り替え</li>
+          <li>文字数 / 行数カウンター</li>
+          <li>エディタ / プレビュー切り替え</li>
+        </ul>
+      </section>
     </main>
+
+    <footer class="landing-footer">
+      <small>© <span id="landing-year"></span> High Performance Memo</small>
+    </footer>
   </div>
 
-  <script src="app.js" defer></script>
+  <script>
+    (function () {
+      const yearEl = document.getElementById('landing-year');
+      yearEl.textContent = new Date().getFullYear();
+
+      const themeKey = 'hp-memo-theme';
+      const saved = localStorage.getItem(themeKey);
+      const initial = saved || 'dark';
+      document.documentElement.setAttribute('data-theme', initial);
+
+      const btn = document.getElementById('landing-theme-toggle');
+      if (btn) {
+        btn.textContent = initial === 'dark' ? '🌙' : '☀️';
+        btn.addEventListener('click', () => {
+          const current = document.documentElement.getAttribute('data-theme') || 'dark';
+          const next = current === 'dark' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', next);
+          localStorage.setItem(themeKey, next);
+          btn.textContent = next === 'dark' ? '🌙' : '☀️';
+        });
+      }
+    })();
+  </script>
 </body>
 </html>
