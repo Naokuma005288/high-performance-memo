@@ -1,1 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>High Performance Memo – Memo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <header class="sidebar-header">
+        <h1 class="app-title">Memo</h1>
+        <button id="new-note-btn" class="icon-btn" title="新しいメモ (Ctrl+N)">＋</button>
+      </header>
+
+      <div class="search-box">
+        <input
+          id="search-input"
+          type="text"
+          placeholder="検索（タイトル / 本文 / タグ）"
+        >
+      </div>
+
+      <div class="filter-row">
+        <button class="filter-btn active" data-filter="all">すべて</button>
+        <button class="filter-btn" data-filter="pinned">ピン留め</button>
+      </div>
+
+      <ul id="note-list" class="note-list"></ul>
+    </aside>
+
+    <main class="editor">
+      <div class="editor-header">
+        <input
+          id="note-title"
+          class="note-title-input"
+          type="text"
+          placeholder="タイトル"
+        >
+        <div class="editor-actions">
+          <button id="pin-toggle" class="chip-btn" title="ピン留め切り替え">
+            📌 ピン留め
+          </button>
+          <button id="delete-note" class="chip-btn danger" title="メモを削除">
+            🗑 削除
+          </button>
+        </div>
+      </div>
+
+      <div class="meta-row">
+        <span id="meta-created" class="meta-text"></span>
+        <span id="meta-updated" class="meta-text"></span>
+      </div>
+
+      <textarea
+        id="note-content"
+        class="note-content"
+        placeholder="ここにメモを書く…"
+      ></textarea>
+
+      <div class="tags-row">
+        <input
+          id="tag-input"
+          class="tag-input"
+          type="text"
+          placeholder="タグを入力して Enter"
+        >
+        <div id="tag-list" class="tag-list"></div>
+      </div>
+
+      <div class="bottom-bar">
+        <div class="bottom-left">
+          <button id="save-button" class="bottom-btn">💾 手動保存</button>
+          <button id="export-button" class="bottom-btn">⬇ バックアップ</button>
+          <label class="bottom-btn file-label">
+            ⬆ 読み込み
+            <input id="import-input" type="file" accept="application/json" hidden>
+          </label>
+        </div>
+        <span id="autosave-status" class="autosave-status">保存済み</span>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
 
