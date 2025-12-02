@@ -1,11 +1,13 @@
 (() => {
   const STORAGE_KEY = "hp-memo-notes-v1";
+  const THEME_KEY = "hp-memo-theme";
 
   const state = {
     notes: [],
     activeId: null,
     filter: "all", // 'all' | 'pinned'
     search: "",
+    mode: "edit", // 'edit' | 'preview'
   };
 
   // DOM取得
@@ -25,10 +27,45 @@
   const metaCreatedEl = document.getElementById("meta-created");
   const metaUpdatedEl = document.getElementById("meta-updated");
   const autosaveStatusEl = document.getElementById("autosave-status");
+  const textStatsEl = document.getElementById("text-stats");
+
+  const saveButton = document.getElementById("save-button");
+  const exportButton = document.getElementById("export-button");
+  const importInput = document.getElementById("import-input");
+
+  const themeToggleBtn = document.getElementById("theme-toggle");
+  const modeTabs = document.querySelectorAll(".mode-tab");
+  const previewPane = document.getElementById("preview-pane");
 
   let saveTimer = null;
 
-  // ユーティリティ
+  // --- テーマ関連 ---
+
+  function applyTheme(theme) {
+    const next = theme === "light" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem(THEME_KEY, next);
+    if (themeToggleBtn) {
+      themeToggleBtn.textContent = next === "dark" ? "🌙" : "☀️";
+    }
+  }
+
+  function initTheme() {
+    const saved = localStorage.getItem(THEME_KEY);
+    const initial = saved || "dark";
+    applyTheme(initial);
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener("click", () => {
+        const current =
+          document.documentElement.getAttribute("data-theme") || "dark";
+        const next = current === "dark" ? "light" : "dark";
+        applyTheme(next);
+      });
+    }
+  }
+
+  // --- ユーティリティ ---
+
   function createNote() {
     const now = new Date().toISOString();
     return {
@@ -61,9 +98,16 @@
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
       return parsed.map((n) => ({
-        ...n,
+        id:
+          typeof n.id === "string"
+            ? n.id
+            : "note-" + Date.now() + "-" + Math.random().toString(16).slice(2),
+        title: typeof n.title === "string" ? n.title : "（無題）",
+        content: typeof n.content === "string" ? n.content : "",
         tags: Array.isArray(n.tags) ? n.tags : [],
         pinned: Boolean(n.pinned),
+        createdAt: n.createdAt || new Date().toISOString(),
+        updatedAt: n.updatedAt || new Date().toISOString(),
       }));
     } catch {
       return [];
@@ -73,15 +117,20 @@
   function saveNow() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.notes));
-      autosaveStatusEl.textContent = "保存済み";
-      autosaveStatusEl.classList.remove("saving");
+      if (autosaveStatusEl) {
+        autosaveStatusEl.textContent = "保存済み";
+        autosaveStatusEl.classList.remove("saving");
+      }
     } catch (err) {
       console.error("保存失敗:", err);
-      autosaveStatusEl.textContent = "保存エラー";
+      if (autosaveStatusEl) {
+        autosaveStatusEl.textContent = "保存エラー";
+      }
     }
   }
 
   function scheduleSave() {
+    if (!autosaveStatusEl) return;
     autosaveStatusEl.textContent = "保存中…";
     autosaveStatusEl.classList.add("saving");
     if (saveTimer) clearTimeout(saveTimer);
@@ -96,7 +145,41 @@
     note.updatedAt = new Date().toISOString();
   }
 
-  // フィルタ＆ソート
+  function updateTextStats(text) {
+    if (!textStatsEl) return;
+    const chars = text.length;
+    const lines = text ? text.split(/\r?\n/).length : 0;
+    textStatsEl.textContent = `文字数: ${chars} / 行数: ${lines}`;
+  }
+
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function renderPreviewHtml(text) {
+    const escaped = escapeHtml(text);
+    const lines = escaped.split(/\r?\n/);
+    return lines
+      .map((line) => {
+        if (line.startsWith("# ")) {
+          return `<p class="preview-heading">${line.slice(2)}</p>`;
+        }
+        if (line.startsWith("- ")) {
+          return `<p class="preview-list">• ${line.slice(2)}</p>`;
+        }
+        if (!line) {
+          return "<p><br></p>";
+        }
+        return `<p>${line}</p>`;
+      })
+      .join("");
+  }
+
+  // --- フィルタ＆ソート ---
+
   function getVisibleNotes() {
     const term = state.search.trim().toLowerCase();
     return state.notes
@@ -118,9 +201,10 @@
       });
   }
 
-  // レンダリング
+  // --- レンダリング ---
 
   function renderNoteList() {
+    if (!noteListEl) return;
     const notes = getVisibleNotes();
     noteListEl.innerHTML = "";
 
@@ -173,6 +257,7 @@
   }
 
   function renderTags(note) {
+    if (!tagListEl) return;
     tagListEl.innerHTML = "";
     if (!note || !Array.isArray(note.tags)) return;
     for (const tag of note.tags) {
@@ -197,25 +282,67 @@
 
   function renderEditor() {
     const note = getActiveNote();
+    if (!noteTitleInput || !noteContentTextarea) return;
+
     if (!note) {
       noteTitleInput.value = "";
       noteContentTextarea.value = "";
-      metaCreatedEl.textContent = "";
-      metaUpdatedEl.textContent = "";
+      if (metaCreatedEl) metaCreatedEl.textContent = "";
+      if (metaUpdatedEl) metaUpdatedEl.textContent = "";
       renderTags({ tags: [] });
+      updateTextStats("");
+      if (previewPane) previewPane.innerHTML = "";
       return;
     }
 
     noteTitleInput.value = note.title;
     noteContentTextarea.value = note.content;
-    metaCreatedEl.textContent = `作成: ${formatDate(note.createdAt)}`;
-    metaUpdatedEl.textContent = `更新: ${formatDate(note.updatedAt)}`;
-    pinToggleBtn.textContent = note.pinned ? "📌 ピン解除" : "📌 ピン留め";
+    if (metaCreatedEl) {
+      metaCreatedEl.textContent = `作成: ${formatDate(note.createdAt)}`;
+    }
+    if (metaUpdatedEl) {
+      metaUpdatedEl.textContent = `更新: ${formatDate(note.updatedAt)}`;
+    }
+    if (pinToggleBtn) {
+      pinToggleBtn.textContent = note.pinned ? "📌 ピン解除" : "📌 ピン留め";
+    }
 
     renderTags(note);
+    updateTextStats(note.content);
+
+    if (previewPane && state.mode === "preview") {
+      previewPane.innerHTML = renderPreviewHtml(note.content);
+      noteContentTextarea.style.display = "none";
+      previewPane.hidden = false;
+    } else if (previewPane) {
+      noteContentTextarea.style.display = "block";
+      previewPane.hidden = true;
+    }
   }
 
-  // イベント
+  function setMode(mode) {
+    state.mode = mode === "preview" ? "preview" : "edit";
+    if (!modeTabs || !noteContentTextarea || !previewPane) return;
+
+    modeTabs.forEach((tab) => {
+      const tMode = tab.dataset.mode;
+      tab.classList.toggle("active", tMode === state.mode);
+    });
+
+    const note = getActiveNote();
+    const text = note ? note.content : noteContentTextarea.value;
+
+    if (state.mode === "preview") {
+      previewPane.innerHTML = renderPreviewHtml(text);
+      previewPane.hidden = false;
+      noteContentTextarea.style.display = "none";
+    } else {
+      previewPane.hidden = true;
+      noteContentTextarea.style.display = "block";
+    }
+  }
+
+  // --- イベントハンドラ ---
 
   function handleNewNote() {
     const note = createNote();
@@ -224,7 +351,7 @@
     renderNoteList();
     renderEditor();
     scheduleSave();
-    noteTitleInput.focus();
+    if (noteTitleInput) noteTitleInput.focus();
   }
 
   function handleSelectNote(id) {
@@ -236,26 +363,32 @@
 
   function handleTitleInput() {
     const note = getActiveNote();
-    if (!note) return;
+    if (!note || !noteTitleInput) return;
     note.title = noteTitleInput.value;
     touchNote(note);
-    renderNoteList(); // タイトル・更新日時を反映
+    renderNoteList();
     scheduleSave();
   }
 
   function handleContentInput() {
     const note = getActiveNote();
-    if (!note) return;
+    if (!note || !noteContentTextarea) return;
     note.content = noteContentTextarea.value;
     touchNote(note);
-    // 毎回リストを描き直すと重いので、ここでは保存だけ
     scheduleSave();
-    metaUpdatedEl.textContent = `更新: ${formatDate(note.updatedAt)}`;
+    if (metaUpdatedEl) {
+      metaUpdatedEl.textContent = `更新: ${formatDate(note.updatedAt)}`;
+    }
+    updateTextStats(note.content);
+    if (previewPane && state.mode === "preview") {
+      previewPane.innerHTML = renderPreviewHtml(note.content);
+    }
   }
 
   function handleTagKeyDown(e) {
     if (e.key !== "Enter") return;
     e.preventDefault();
+    if (!tagInput) return;
     const value = tagInput.value.trim();
     if (!value) return;
 
@@ -317,6 +450,7 @@
   }
 
   function handleSearchInput() {
+    if (!searchInput) return;
     state.search = searchInput.value;
     renderNoteList();
   }
@@ -341,20 +475,109 @@
   }
 
   function handleKeyDown(e) {
-    if (!e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) return;
-
-    if (e.key === "n" || e.key === "N") {
-      e.preventDefault();
-      handleNewNote();
-    } else if (e.key === "s" || e.key === "S") {
-      e.preventDefault();
-      saveNow();
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        handleNewNote();
+      } else if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        if (autosaveStatusEl) {
+          autosaveStatusEl.textContent = "保存中…";
+          autosaveStatusEl.classList.add("saving");
+        }
+        saveNow();
+      } else if (e.key === "f" || e.key === "F") {
+        if (searchInput) {
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
     }
   }
 
-  // 初期化
+  // --- 手動保存 / エクスポート / インポート ---
+
+  function handleExport() {
+    const data = JSON.stringify(state.notes, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    a.href = url;
+    a.download = `memo-backup-${y}${m}${d}.json`;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = String(reader.result);
+        const parsed = JSON.parse(text);
+        if (!Array.isArray(parsed)) {
+          throw new Error("invalid format");
+        }
+
+        const ok = window.confirm(
+          "現在のメモを、バックアップファイルの内容で置き換えますか？"
+        );
+        if (!ok) return;
+
+        state.notes = parsed.map((n) => ({
+          id:
+            typeof n.id === "string"
+              ? n.id
+              : "note-" + Date.now() + "-" + Math.random().toString(16).slice(2),
+          title: typeof n.title === "string" ? n.title : "（無題）",
+          content: typeof n.content === "string" ? n.content : "",
+          tags: Array.isArray(n.tags) ? n.tags : [],
+          pinned: Boolean(n.pinned),
+          createdAt: n.createdAt || new Date().toISOString(),
+          updatedAt: n.updatedAt || new Date().toISOString(),
+        }));
+
+        if (state.notes.length === 0) {
+          const first = createNote();
+          state.notes.push(first);
+          state.activeId = first.id;
+        } else {
+          state.notes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+          state.activeId = state.notes[0].id;
+        }
+
+        saveNow();
+        renderNoteList();
+        renderEditor();
+      } catch (err) {
+        console.error(err);
+        window.alert(
+          "バックアップの読み込みに失敗しました。ファイル形式を確認してください。"
+        );
+      } finally {
+        if (importInput) importInput.value = "";
+      }
+    };
+
+    reader.readAsText(file, "utf-8");
+  }
+
+  // --- 初期化 ---
 
   function init() {
+    initTheme();
+
     state.notes = loadNotes();
     if (state.notes.length === 0) {
       const first = createNote();
@@ -362,36 +585,65 @@
       state.activeId = first.id;
       saveNow();
     } else {
-      // 一番最近更新されたメモを開く
       state.notes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
       state.activeId = state.notes[0].id;
     }
 
     renderNoteList();
     renderEditor();
-    autosaveStatusEl.textContent = "保存済み";
+    if (autosaveStatusEl) autosaveStatusEl.textContent = "保存済み";
+
+    if (modeTabs) {
+      modeTabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const m = tab.dataset.mode;
+          setMode(m);
+        });
+      });
+    }
   }
 
-  // イベント登録
-  newNoteBtn.addEventListener("click", handleNewNote);
-  noteListEl.addEventListener("click", handleNoteListClick);
-  searchInput.addEventListener("input", handleSearchInput);
+  // イベント登録（存在チェックしながら）
+
+  if (newNoteBtn) newNoteBtn.addEventListener("click", handleNewNote);
+  if (noteListEl) noteListEl.addEventListener("click", handleNoteListClick);
+  if (searchInput) searchInput.addEventListener("input", handleSearchInput);
   filterButtons.forEach((btn) =>
     btn.addEventListener("click", handleFilterClick)
   );
 
-  noteTitleInput.addEventListener("input", handleTitleInput);
-  noteContentTextarea.addEventListener("input", handleContentInput);
+  if (noteTitleInput) noteTitleInput.addEventListener("input", handleTitleInput);
+  if (noteContentTextarea)
+    noteContentTextarea.addEventListener("input", handleContentInput);
 
-  tagInput.addEventListener("keydown", handleTagKeyDown);
-  tagListEl.addEventListener("click", handleTagClick);
+  if (tagInput) tagInput.addEventListener("keydown", handleTagKeyDown);
+  if (tagListEl) tagListEl.addEventListener("click", handleTagClick);
 
-  pinToggleBtn.addEventListener("click", handlePinToggle);
-  deleteNoteBtn.addEventListener("click", handleDeleteNote);
+  if (pinToggleBtn) pinToggleBtn.addEventListener("click", handlePinToggle);
+  if (deleteNoteBtn) deleteNoteBtn.addEventListener("click", handleDeleteNote);
+
+  if (saveButton) {
+    saveButton.addEventListener("click", () => {
+      if (autosaveStatusEl) {
+        autosaveStatusEl.textContent = "保存中…";
+        autosaveStatusEl.classList.add("saving");
+      }
+      saveNow();
+    });
+  }
+
+  if (exportButton) {
+    exportButton.addEventListener("click", handleExport);
+  }
+
+  if (importInput) {
+    importInput.addEventListener("change", handleImport);
+  }
 
   document.addEventListener("keydown", handleKeyDown);
 
   // 実行
-  init();
+  if (noteListEl || noteTitleInput || noteContentTextarea) {
+    init();
+  }
 })();
-
