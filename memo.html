@@ -31,6 +31,11 @@
     </aside>
 
     <main class="editor">
+      <div class="editor-top">
+        <a href="index.html" class="top-link">← ランディングに戻る</a>
+        <button id="theme-toggle" class="top-theme-btn" title="テーマ切り替え">🌙</button>
+      </div>
+
       <div class="editor-header">
         <input
           id="note-title"
@@ -53,11 +58,18 @@
         <span id="meta-updated" class="meta-text"></span>
       </div>
 
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="edit">エディタ</button>
+        <button class="mode-tab" data-mode="preview">プレビュー</button>
+      </div>
+
       <textarea
         id="note-content"
         class="note-content"
         placeholder="ここにメモを書く…"
       ></textarea>
+
+      <div id="preview-pane" class="preview-pane" hidden></div>
 
       <div class="tags-row">
         <input
@@ -78,7 +90,10 @@
             <input id="import-input" type="file" accept="application/json" hidden>
           </label>
         </div>
-        <span id="autosave-status" class="autosave-status">保存済み</span>
+        <div class="bottom-right">
+          <span id="text-stats" class="text-stats"></span>
+          <span id="autosave-status" class="autosave-status">保存済み</span>
+        </div>
       </div>
     </main>
   </div>
@@ -86,4 +101,3 @@
   <script src="app.js" defer></script>
 </body>
 </html>
-
